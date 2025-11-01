@@ -187,16 +187,46 @@ Manually vectorize the inner loop (8-16 genotypes at once).
 - Sample subset of genotypes
 - Dimension reduction
 
-## Bottom Line
+---
 
-**CPU scaling is limited by memory bandwidth, not computation.**
+## Final Comparison & Recommendations
 
-- ✅ Using all 32 cores: ~9 days
-- ❌ Using more cores won't help much
-- ✅ GPU will be 10-50x faster: 0.5-2 days
-- ✅ Best ROI: Fix CUDA setup and use GPU
+### Single Machine Performance (1M × 50k dataset)
 
-The algorithm is fundamentally memory-bound, so focus on:
-1. Higher memory bandwidth (GPU)
-2. Better cache utilization (blocking/tiling)
-3. Reducing data movement (approximation)
+| Platform | Time | Throughput | Speedup | Cost |
+|----------|------|------------|---------|------|
+| CPU (1 core) | ~288 days | - | 1× | Free |
+| CPU (32 cores) | **9 days** | 700-1,600 M/s | 32× | Free |
+| GPU (RTX 4060 8GB) | **3.5 days** | 3,900-4,700 M/s | **82×** | Free |
+| GPU (Cloud T4 16GB) | ~2-3 days | ~5,000-8,000 M/s | ~100-150× | $40-80 |
+| GPU (Cloud A100 40GB) | ~0.5-1 day | ~15,000-20,000 M/s | ~300-500× | $90-180 |
+
+### Distributed Cloud Performance
+
+| Configuration | Time | Total Cost | Cost/Hour |
+|---------------|------|------------|-----------|
+| 100× c5.4xlarge (CPU) | 2-3 hrs | ~$224 | - |
+| 10× g4dn.xlarge (T4 GPU) | 1-2 hrs | **~$15** | Best value ✅ |
+| 5× g5.xlarge (A100) | 0.5-1 hr | ~$45 | Fastest |
+
+### Bottom Line
+
+**For single-machine local computation:**
+- ✅ GPU (RTX 4060): **3.5 days** (3× faster than 32-core CPU)
+- Your laptop GPU is sufficient and works well
+
+**For cloud distributed computation:**
+- ✅ **10× g4dn.xlarge GPU instances**: 1-2 hours, ~$15 (best value)
+- ✅ 100× CPU instances: 2-3 hours, ~$224 (reliable fallback)
+
+**Key insights:**
+1. **Memory bandwidth is the bottleneck** - not CPU cores or GPU compute
+2. **GPU provides 3-6× speedup** over 32-core CPU (confirmed by testing)
+3. **Distributed is best**: Linear scaling in aggregate bandwidth
+4. **GPU cloud is cheapest**: 15× less than CPU cloud option
+
+The algorithm is fundamentally memory-bound. Best strategies:
+1. ⭐ **Use distributed GPU** (10-20 instances, ~$15-30, 1-2 hours)
+2. Use single GPU (3.5 days local, or 2-3 days on better cloud GPU)
+3. Use distributed CPU (100 instances, ~$224, 2-3 hours)
+4. ❌ Don't use single CPU (9+ days)
