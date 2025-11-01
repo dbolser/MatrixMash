@@ -1,0 +1,73 @@
+GPU: NVIDIA GeForce RTX 4060 Laptop GPU
+Memory: 8.3 GB
+============================================================
+
+============================================================
+TEST 1: Varying N (individuals), M=10,000 fixed
+============================================================
+
+Testing M=10,000, N=1,000, chunk_size=500
+------------------------------------------------------------
+Time: 1.657 seconds
+Throughput: 302059 pairs/sec
+Comparisons: 3020.6 M/sec
+
+Testing M=10,000, N=2,000, chunk_size=500
+------------------------------------------------------------
+Time: 4.892 seconds
+Throughput: 409050 pairs/sec
+Comparisons: 4090.5 M/sec
+
+Testing M=10,000, N=3,000, chunk_size=500
+------------------------------------------------------------
+Time: 10.200 seconds
+Throughput: 441312 pairs/sec
+Comparisons: 4413.1 M/sec
+
+Testing M=10,000, N=4,000, chunk_size=500
+------------------------------------------------------------
+Time: 17.516 seconds
+Throughput: 456852 pairs/sec
+Comparisons: 4568.5 M/sec
+
+Testing M=10,000, N=5,000, chunk_size=500
+------------------------------------------------------------
+Time: 26.636 seconds
+Throughput: 469381 pairs/sec
+Comparisons: 4693.8 M/sec
+
+============================================================
+TEST 2: Varying M (genotypes), N=2,000 fixed
+============================================================
+
+Testing M=10,000, N=2,000, chunk_size=500
+------------------------------------------------------------
+Time: 4.713 seconds
+Throughput: 424530 pairs/sec
+Comparisons: 4245.3 M/sec
+
+Testing M=25,000, N=2,000, chunk_size=300
+------------------------------------------------------------
+Time: 11.735 seconds
+Throughput: 170516 pairs/sec
+Comparisons: 4262.9 M/sec
+
+Testing M=50,000, N=2,000, chunk_size=200
+------------------------------------------------------------
+Time: 25.589 seconds
+Throughput: 78197 pairs/sec
+Comparisons: 3909.8 M/sec
+
+Testing M=75,000, N=2,000, chunk_size=150
+------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/dan/Build/MatrixMash/gpu_scaling_test.py", line 103, in <module>
+    result = benchmark(M, N, chunk_size)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/dan/Build/MatrixMash/gpu_scaling_test.py", line 35, in benchmark
+    distances = compute_distance_torch(genotypes, scores, chunk_size, device)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/dan/Build/MatrixMash/distance_torch.py", line 68, in compute_distance_torch
+    dist = torch.where(diff == 1, s2_broadcast,
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 2.10 GiB. GPU 0 has a total capacity of 7.73 GiB of which 402.75 MiB is free. Including non-PyTorch memory, this process has 6.42 GiB memory in use. Of the allocated memory 4.21 GiB is allocated by PyTorch, and 2.10 GiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)
