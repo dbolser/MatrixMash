@@ -48,7 +48,11 @@ def compute_distance_torch(genotypes: np.ndarray, scores: np.ndarray,
 
             # Process in smaller sub-chunks to avoid OOM
             # This reduces peak memory by computing row-by-row instead of full 3D tensor
-            sub_chunk = min(50, n_i)  # Process 50 rows at a time
+            # Adaptive sub-chunk based on M: aim for ~500MB intermediate tensors
+            # Memory = M × sub_chunk × n_j × 2 bytes (int16)
+            target_memory = 500_000_000  # 500 MB
+            max_sub_chunk = max(1, target_memory // (M * n_j * 2))
+            sub_chunk = min(max_sub_chunk, n_i)
             for ii in range(0, n_i, sub_chunk):
                 ii_end = min(ii + sub_chunk, n_i)
 
