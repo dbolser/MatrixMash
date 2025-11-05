@@ -85,10 +85,10 @@ if __name__ == "__main__":
 
     # Test 2: Vary M, keep N constant (test genotype scaling)
     print("\n" + "="*60)
-    print("TEST 2: Varying M (genotypes), N=2,000 fixed")
+    print("TEST 2: Varying M (genotypes), N=4,000 fixed")
     print("="*60)
 
-    N = 2_000
+    N = 4_000
 
     for M in [10_000, 25_000, 50_000, 75_000, 100_000]:
         # Use smaller chunks for larger M to avoid OOM
