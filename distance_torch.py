@@ -92,71 +92,40 @@ def compute_distance_torch(genotypes: np.ndarray, scores: np.ndarray,
 
 
 if __name__ == "__main__":
-    import argparse
+    from benchmark_utils import (
+        create_argument_parser,
+        load_data,
+        run_standard_benchmark,
+        save_output
+    )
 
-    parser = argparse.ArgumentParser(description="PyTorch distance matrix")
-    parser.add_argument("genotypes_file", help="Path to genotypes .npy file")
-    parser.add_argument("scores_file", help="Path to scores .npy file")
+    parser = create_argument_parser("PyTorch GPU implementation")
     parser.add_argument("--chunk-size", type=int, default=5000,
                        help="Chunk size for processing (default: 5000)")
     parser.add_argument("--device", default="cuda", help="Device: cuda or cpu")
-
     args = parser.parse_args()
 
     # Check CUDA
     if args.device == "cuda" and not torch.cuda.is_available():
-        print("CUDA not available, falling back to CPU")
+        print("⚠ CUDA not available, falling back to CPU")
         args.device = "cpu"
 
     if args.device == "cuda":
         print(f"Using GPU: {torch.cuda.get_device_name(0)}")
         print(f"GPU Memory: {torch.cuda.get_device_properties(0).total_memory / 1e9:.1f} GB")
 
-    # Load data
-    print("Loading data...")
-    genotypes = np.load(args.genotypes_file)
-    scores = np.load(args.scores_file)
+    genotypes, scores = load_data(args.genotypes_file, args.scores_file)
 
-    M, N = genotypes.shape
-    print(f"Genotypes: {M} × {N}")
-    print(f"Chunk size: {args.chunk_size}")
+    # Create wrapper with device and chunk_size
+    def compute_with_args(genotypes, scores):
+        return compute_distance_torch(genotypes, scores, args.chunk_size, args.device)
 
-    # Benchmark
-    print("\n" + "="*60)
-    print(f"Benchmarking: PyTorch ({args.device.upper()})")
-    print("="*60)
+    elapsed, distances = run_standard_benchmark(
+        compute_with_args,
+        f"PyTorch ({args.device.upper()}, chunk_size={args.chunk_size})",
+        genotypes,
+        scores
+    )
 
-    start = time.time()
-    distances = compute_distance_torch(genotypes, scores, args.chunk_size, args.device)
-    elapsed = time.time() - start
-
-    print(f"✓ Completed in {elapsed:.3f} seconds")
-    print(f"  Result shape: {distances.shape}")
-    print(f"  Result range: [{distances.min():.2f}, {distances.max():.2f}]")
-    print(f"  Memory: {distances.nbytes / 1e6:.1f} MB")
-
-    # Extrapolate
-    M_full = 1_000_000
-    N_full = 50_000
-
-    scale_factor = (N_full / N) ** 2 * (M_full / M)
-    estimated_time = elapsed * scale_factor
-
-    print(f"\n" + "="*60)
-    print(f"EXTRAPOLATION TO FULL DATASET")
-    print(f"="*60)
-    print(f"Current: {M:,} genotypes × {N:,} individuals")
-    print(f"Target:  {M_full:,} genotypes × {N_full:,} individuals")
-    print(f"Scale factor: {scale_factor:.1f}x")
-    print(f"Estimated time: {estimated_time:.1f} seconds ({estimated_time/3600:.2f} hours)")
-    print(f"                ({estimated_time/86400:.2f} days)")
-
-    # Throughput
-    pairs_computed = N * (N + 1) // 2
-    throughput = pairs_computed / elapsed
-    print(f"\nThroughput: {throughput:.0f} pairs/second")
-
-    full_pairs = N_full * (N_full + 1) // 2
-    print(f"Full dataset: {full_pairs:,} pairs to compute")
-    estimated_full_time = full_pairs / throughput
-    print(f"Estimated from throughput: {estimated_full_time:.1f} seconds ({estimated_full_time/3600:.2f} hours)")
+    if args.output:
+        save_output(args.output, distances)

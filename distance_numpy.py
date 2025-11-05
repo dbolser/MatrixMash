@@ -188,50 +188,29 @@ def benchmark(func, genotypes, scores, name):
 
 
 if __name__ == "__main__":
-    import argparse
+    from benchmark_utils import (
+        create_argument_parser,
+        load_data,
+        run_standard_benchmark,
+        save_output
+    )
 
-    parser = argparse.ArgumentParser(description="Benchmark distance matrix computation")
-    parser.add_argument("genotypes_file", help="Path to genotypes .npy file")
-    parser.add_argument("scores_file", help="Path to scores .npy file")
+    parser = create_argument_parser("NumPy-based implementations")
     parser.add_argument("--method", choices=["cpu", "cpu-vec", "gpu"],
-                       default="gpu", help="Method to use")
-    parser.add_argument("--max-individuals", type=int,
-                       help="Limit number of individuals for testing")
-
+                       default="gpu", help="Method: cpu (naive), cpu-vec (vectorized), gpu (CuPy)")
     args = parser.parse_args()
 
-    # Load data
-    print("Loading data...")
-    genotypes = np.load(args.genotypes_file)
-    scores = np.load(args.scores_file)
-
-    if args.max_individuals:
-        genotypes = genotypes[:, :args.max_individuals]
-        print(f"Limited to {args.max_individuals} individuals")
+    genotypes, scores = load_data(args.genotypes_file, args.scores_file)
 
     # Select method
     methods = {
-        "cpu": (compute_distance_cpu, "CPU Naive"),
-        "cpu-vec": (compute_distance_cpu_vectorized, "CPU Vectorized"),
-        "gpu": (compute_distance_gpu_cupy, "GPU CuPy"),
+        "cpu": (compute_distance_cpu, "NumPy CPU (naive)"),
+        "cpu-vec": (compute_distance_cpu_vectorized, "NumPy CPU (vectorized)"),
+        "gpu": (compute_distance_gpu_cupy, "CuPy GPU"),
     }
 
     func, name = methods[args.method]
-    elapsed, result = benchmark(func, genotypes, scores, name)
+    elapsed, distances = run_standard_benchmark(func, name, genotypes, scores)
 
-    # Estimate full dataset
-    M, N = genotypes.shape
-    M_full = 1_000_000
-    N_full = 50_000
-
-    # Scaling is roughly O(N^2 * M)
-    scale_factor = (N_full / N) ** 2 * (M_full / M)
-    estimated_time = elapsed * scale_factor
-
-    print(f"\n{'='*60}")
-    print(f"EXTRAPOLATION TO FULL DATASET")
-    print(f"{'='*60}")
-    print(f"Current: {M} genotypes × {N} individuals")
-    print(f"Target:  {M_full:,} genotypes × {N_full:,} individuals")
-    print(f"Scale factor: {scale_factor:.1f}x")
-    print(f"Estimated time: {estimated_time:.1f} seconds ({estimated_time/3600:.2f} hours)")
+    if args.output:
+        save_output(args.output, distances)

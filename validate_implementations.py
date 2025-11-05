@@ -33,13 +33,10 @@ def test_reference():
 def test_cpu_optimized():
     """Test optimized CPU implementation."""
     print("\nTesting CPU (Numba optimized)...")
-    from distance_optimized import compute_distance_numba_cpu
+    from distance_numba_cpu import compute_distance_numba_cpu
 
     genotypes, scores = generate_test_data()
-    M, N = genotypes.shape
-    distances = np.zeros((N, N), dtype=np.float32)
-
-    compute_distance_numba_cpu(genotypes, scores, distances)
+    distances = compute_distance_numba_cpu(genotypes, scores)
 
     print(f"  ✓ Shape: {distances.shape}")
     print(f"  ✓ Range: [{distances.min():.4f}, {distances.max():.4f}]")

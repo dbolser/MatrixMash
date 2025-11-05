@@ -9,9 +9,9 @@ from numba import njit, prange
 import time
 
 @njit(parallel=True, fastmath=True)
-def compute_distance_numba_cpu(genotypes, scores, distances):
+def _compute_distance_numba_cpu_kernel(genotypes, scores, distances):
     """
-    Numba JIT-compiled CPU implementation with parallel loops.
+    Numba JIT-compiled CPU kernel (internal).
 
     Args:
         genotypes: M × N uint8 array
@@ -51,10 +51,28 @@ def compute_distance_numba_cpu(genotypes, scores, distances):
             distances[j, i] = dist_sum
 
 
+def compute_distance_numba_cpu(genotypes, scores):
+    """
+    Numba JIT-compiled CPU implementation with parallel loops.
+
+    Uniform API: returns distance matrix.
+
+    Args:
+        genotypes: M × N uint8 array
+        scores: M float32 array
+
+    Returns:
+        N × N float32 distance matrix
+    """
+    M, N = genotypes.shape
+    distances = np.zeros((N, N), dtype=np.float32)
+    _compute_distance_numba_cpu_kernel(genotypes, scores, distances)
+    return distances
+
+
 def run_benchmark(genotypes, scores, name="Numba CPU"):
     """Run benchmark and return timing."""
     M, N = genotypes.shape
-    distances = np.zeros((N, N), dtype=np.float32)
 
     print("\n" + "="*60)
     print(f"Benchmarking: {name}")
@@ -66,12 +84,11 @@ def run_benchmark(genotypes, scores, name="Numba CPU"):
         print("Warming up JIT compilation...")
         small_geno = genotypes[:100, :10]
         small_scores = scores[:100]
-        small_dist = np.zeros((10, 10), dtype=np.float32)
-        compute_distance_numba_cpu(small_geno, small_scores, small_dist)
+        _ = compute_distance_numba_cpu(small_geno, small_scores)
 
     # Actual benchmark
     start = time.time()
-    compute_distance_numba_cpu(genotypes, scores, distances)
+    distances = compute_distance_numba_cpu(genotypes, scores)
     elapsed = time.time() - start
 
     print(f"✓ Completed in {elapsed:.3f} seconds")
@@ -125,30 +142,23 @@ def extrapolate_timing(M_current, N_current, elapsed, M_full=1_000_000, N_full=5
 
 
 if __name__ == "__main__":
-    import argparse
+    from benchmark_utils import (
+        create_argument_parser,
+        load_data,
+        run_standard_benchmark,
+        save_output
+    )
 
-    parser = argparse.ArgumentParser(description="Optimized CPU distance matrix")
-    parser.add_argument("genotypes_file", help="Path to genotypes .npy file")
-    parser.add_argument("scores_file", help="Path to scores .npy file")
-    parser.add_argument("--save", help="Save output to file")
-
+    parser = create_argument_parser("Numba JIT CPU implementation")
     args = parser.parse_args()
 
-    # Load data
-    print("Loading data...")
-    genotypes = np.load(args.genotypes_file)
-    scores = np.load(args.scores_file)
+    genotypes, scores = load_data(args.genotypes_file, args.scores_file)
+    elapsed, distances = run_standard_benchmark(
+        compute_distance_numba_cpu,
+        "Numba CPU (JIT-compiled, parallel)",
+        genotypes,
+        scores
+    )
 
-    M, N = genotypes.shape
-
-    # Run benchmark
-    elapsed, distances = run_benchmark(genotypes, scores)
-
-    # Extrapolate
-    extrapolate_timing(M, N, elapsed)
-
-    # Save if requested
-    if args.save:
-        print(f"\nSaving to {args.save}...")
-        np.save(args.save, distances)
-        print(f"Saved {distances.nbytes / 1e6:.1f} MB")
+    if args.output:
+        save_output(args.output, distances)

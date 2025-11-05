@@ -124,19 +124,17 @@ def benchmark_vectorized_numpy(genotypes, scores):
 
 def benchmark_numba_cpu(genotypes, scores):
     """Level 3: Numba JIT-compiled CPU (parallel)."""
-    from distance_optimized import compute_distance_numba_cpu
+    from distance_numba_cpu import compute_distance_numba_cpu
 
     M, N = genotypes.shape
-    distances = np.zeros((N, N), dtype=np.float32)
 
     # Warmup JIT
     small_geno = genotypes[:100, :10] if N > 10 else genotypes[:10, :min(3, N)]
     small_scores = scores[:100] if len(scores) > 100 else scores[:10]
-    small_dist = np.zeros((small_geno.shape[1], small_geno.shape[1]), dtype=np.float32)
-    compute_distance_numba_cpu(small_geno, small_scores, small_dist)
+    _ = compute_distance_numba_cpu(small_geno, small_scores)
 
     start = time.time()
-    compute_distance_numba_cpu(genotypes, scores, distances)
+    distances = compute_distance_numba_cpu(genotypes, scores)
     elapsed = time.time() - start
 
     return elapsed, distances

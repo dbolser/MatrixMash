@@ -2,35 +2,10 @@
 """Test CPU core scaling."""
 
 import numpy as np
-from numba import njit, prange, set_num_threads, get_num_threads
+from numba import set_num_threads
 import time
 import os
-
-@njit(parallel=True, fastmath=True)
-def compute_distance_numba_cpu(genotypes, scores, distances):
-    """Numba JIT-compiled CPU implementation with parallel loops."""
-    M, N = genotypes.shape
-    s2 = scores * scores
-
-    for i in prange(N):
-        for j in range(i, N):
-            dist_sum = 0.0
-            for m in range(M):
-                geno_i = genotypes[m, i]
-                geno_j = genotypes[m, j]
-
-                if geno_i == 9 or geno_j == 9:
-                    continue
-
-                diff = abs(int(geno_i) - int(geno_j))
-
-                if diff == 1:
-                    dist_sum += s2[m]
-                elif diff == 2:
-                    dist_sum += 4.0 * s2[m]
-
-            distances[i, j] = dist_sum
-            distances[j, i] = dist_sum
+from distance_numba_cpu import _compute_distance_numba_cpu_kernel
 
 
 def benchmark_threads(genotypes, scores, num_threads):
@@ -46,11 +21,11 @@ def benchmark_threads(genotypes, scores, num_threads):
         small_geno = genotypes[:100, :10]
         small_scores = scores[:100]
         small_dist = np.zeros((10, 10), dtype=np.float32)
-        compute_distance_numba_cpu(small_geno, small_scores, small_dist)
+        _compute_distance_numba_cpu_kernel(small_geno, small_scores, small_dist)
 
     # Benchmark
     start = time.time()
-    compute_distance_numba_cpu(genotypes, scores, distances)
+    _compute_distance_numba_cpu_kernel(genotypes, scores, distances)
     elapsed = time.time() - start
 
     return elapsed, distances

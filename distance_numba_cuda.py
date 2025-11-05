@@ -31,8 +31,12 @@ def compute_distance_kernel(genotypes, scores, distances, M, N):
             if geno_i == 9 or geno_j == 9:
                 continue
 
-            # Compute difference (use np.int32 to avoid unsigned underflow)
-            diff = abs(np.int32(geno_i) - np.int32(geno_j))
+            # Compute absolute difference (avoid unsigned underflow)
+            # Manual absolute difference to ensure correct signed arithmetic
+            if geno_i > geno_j:
+                diff = geno_i - geno_j
+            else:
+                diff = geno_j - geno_i
 
             # Distance contribution
             s = scores[m]
@@ -191,61 +195,47 @@ def compute_distance_numba_cuda_chunked(genotypes: np.ndarray, scores: np.ndarra
 
 
 if __name__ == "__main__":
-    import argparse
+    import sys
 
-    parser = argparse.ArgumentParser(description="Numba CUDA distance matrix")
-    parser.add_argument("genotypes_file", help="Path to genotypes .npy file")
-    parser.add_argument("scores_file", help="Path to scores .npy file")
-    parser.add_argument("--chunk-size", type=int, default=5000,
-                       help="Chunk size for processing (default: 5000)")
+    print("="*70)
+    print("⚠ WARNING: Numba CUDA implementation is currently unstable")
+    print("="*70)
+    print("This implementation has known issues and may crash.")
+    print("For production use, please use instead:")
+    print("  - distance_cuda_wrapper.py (CUDA C++ - fastest, most stable)")
+    print("  - distance_torch.py (PyTorch GPU - fast, stable)")
+    print("  - distance_numba_cpu.py (Numba CPU - stable)")
+    print("="*70)
+    print()
 
+    response = input("Continue anyway? (y/N): ").strip().lower()
+    if response != 'y':
+        print("Exiting.")
+        sys.exit(0)
+
+    from benchmark_utils import (
+        create_argument_parser,
+        load_data,
+        run_standard_benchmark,
+        save_output
+    )
+
+    parser = create_argument_parser("Numba CUDA GPU implementation (EXPERIMENTAL)")
     args = parser.parse_args()
 
-    # Load data
-    print("Loading data...")
-    genotypes = np.load(args.genotypes_file)
-    scores = np.load(args.scores_file)
+    try:
+        genotypes, scores = load_data(args.genotypes_file, args.scores_file)
+        elapsed, distances = run_standard_benchmark(
+            compute_distance_numba_cuda,
+            "Numba CUDA GPU (EXPERIMENTAL)",
+            genotypes,
+            scores
+        )
 
-    M, N = genotypes.shape
-    print(f"Genotypes: {M} × {N}")
-    print(f"Chunk size: {args.chunk_size}")
-
-    # Benchmark
-    print("\n" + "="*60)
-    print("Benchmarking: Numba CUDA (chunked)")
-    print("="*60)
-
-    start = time.time()
-    if N <= args.chunk_size:
-        distances = compute_distance_numba_cuda(genotypes, scores)
-    else:
-        distances = compute_distance_numba_cuda_chunked(genotypes, scores, args.chunk_size)
-    elapsed = time.time() - start
-
-    print(f"✓ Completed in {elapsed:.3f} seconds")
-    print(f"  Result shape: {distances.shape}")
-    print(f"  Result range: [{distances.min():.2f}, {distances.max():.2f}]")
-    print(f"  Memory: {distances.nbytes / 1e6:.1f} MB")
-
-    # Extrapolate
-    M_full = 1_000_000
-    N_full = 50_000
-
-    scale_factor = (N_full / N) ** 2 * (M_full / M)
-    estimated_time = elapsed * scale_factor
-
-    print(f"\n" + "="*60)
-    print(f"EXTRAPOLATION TO FULL DATASET")
-    print(f"="*60)
-    print(f"Current: {M} genotypes × {N} individuals")
-    print(f"Target:  {M_full:,} genotypes × {N_full:,} individuals")
-    print(f"Scale factor: {scale_factor:.1f}x")
-    print(f"Estimated time: {estimated_time:.1f} seconds ({estimated_time/3600:.2f} hours)")
-
-    # Throughput
-    pairs_computed = N * (N + 1) // 2
-    throughput = pairs_computed / elapsed
-    print(f"\nThroughput: {throughput:.0f} pairs/second")
-
-    full_pairs = N_full * (N_full + 1) // 2
-    print(f"Full dataset: {full_pairs:,} pairs to compute")
+        if args.output:
+            save_output(args.output, distances)
+    except Exception as e:
+        print(f"\n❌ Error: {e}")
+        print("\nThis implementation is experimental and unstable.")
+        print("Please use distance_cuda_wrapper.py or distance_torch.py instead.")
+        sys.exit(1)

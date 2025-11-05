@@ -79,65 +79,23 @@ def compute_distance_cuda(genotypes, scores):
 
 
 if __name__ == "__main__":
-    import argparse
+    from benchmark_utils import (
+        create_argument_parser,
+        load_data,
+        run_standard_benchmark,
+        save_output
+    )
 
-    parser = argparse.ArgumentParser(description="CUDA distance matrix computation")
-    parser.add_argument("genotypes_file", help="Path to genotypes .npy file")
-    parser.add_argument("scores_file", help="Path to scores .npy file")
-    parser.add_argument("--output", "-o", help="Save output to file")
-
+    parser = create_argument_parser("CUDA C++ kernel implementation")
     args = parser.parse_args()
 
-    print("Loading data...")
-    genotypes = np.load(args.genotypes_file)
-    scores = np.load(args.scores_file)
+    genotypes, scores = load_data(args.genotypes_file, args.scores_file)
+    elapsed, distances = run_standard_benchmark(
+        compute_distance_cuda,
+        "CUDA C++ Kernel",
+        genotypes,
+        scores
+    )
 
-    M, N = genotypes.shape
-    print(f"Genotypes: {M:,} × {N:,}")
-    print(f"Input size: {genotypes.nbytes/1e6:.1f} MB")
-
-    print("\n" + "="*60)
-    print("Benchmarking: CUDA C++ Kernel")
-    print("="*60)
-
-    start = time.time()
-    distances = compute_distance_cuda(genotypes, scores)
-    elapsed = time.time() - start
-
-    print(f"✓ Completed in {elapsed:.3f} seconds")
-    print(f"  Result shape: {distances.shape}")
-    print(f"  Result range: [{distances.min():.2f}, {distances.max():.2f}]")
-    print(f"  Memory: {distances.nbytes / 1e6:.1f} MB")
-
-    # Extrapolate
-    M_full = 1_000_000
-    N_full = 50_000
-
-    pairs_computed = N * (N + 1) // 2
-    throughput = pairs_computed / elapsed
-    comparisons_per_sec = pairs_computed * M / elapsed
-
-    print(f"\nThroughput: {throughput:.0f} pairs/second")
-    print(f"Comparisons: {comparisons_per_sec/1e6:.1f} M/sec")
-
-    scale_factor = (N_full / N) ** 2 * (M_full / M)
-    estimated_time = elapsed * scale_factor
-
-    print(f"\n" + "="*60)
-    print(f"EXTRAPOLATION TO FULL DATASET")
-    print(f"="*60)
-    print(f"Current: {M:,} genotypes × {N:,} individuals")
-    print(f"Target:  {M_full:,} genotypes × {N_full:,} individuals")
-    print(f"Scale factor: {scale_factor:.1f}x")
-    print(f"Estimated time: {estimated_time:.1f} seconds ({estimated_time/3600:.2f} hours)")
-    print(f"                ({estimated_time/86400:.2f} days)")
-
-    full_pairs = N_full * (N_full + 1) // 2
-    estimated_full_time = full_pairs * M_full / comparisons_per_sec
-    print(f"Estimated from throughput: {estimated_full_time:.1f} seconds ({estimated_full_time/3600:.2f} hours)")
-
-    # Save if requested
     if args.output:
-        print(f"\nSaving to {args.output}...")
-        np.save(args.output, distances)
-        print(f"Saved {distances.nbytes / 1e6:.1f} MB")
+        save_output(args.output, distances)

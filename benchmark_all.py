@@ -28,20 +28,18 @@ def benchmark_reference(genotypes, scores):
 
 def benchmark_cpu(genotypes, scores):
     """Benchmark optimized CPU implementation."""
-    from distance_optimized import compute_distance_numba_cpu
+    from distance_numba_cpu import compute_distance_numba_cpu
 
     M, N = genotypes.shape
-    distances = np.zeros((N, N), dtype=np.float32)
 
     # Warmup JIT
     if N > 10:
         small_geno = genotypes[:100, :10]
         small_scores = scores[:100]
-        small_dist = np.zeros((10, 10), dtype=np.float32)
-        compute_distance_numba_cpu(small_geno, small_scores, small_dist)
+        _ = compute_distance_numba_cpu(small_geno, small_scores)
 
     start = time.time()
-    compute_distance_numba_cpu(genotypes, scores, distances)
+    distances = compute_distance_numba_cpu(genotypes, scores)
     elapsed = time.time() - start
 
     return elapsed, distances
