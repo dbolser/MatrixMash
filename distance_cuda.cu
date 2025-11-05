@@ -45,24 +45,33 @@ __global__ void compute_distance_kernel(
         int m_end = min(m_start + GENOTYPE_CHUNK, M);
         int chunk_size = m_end - m_start;
 
-        // Cooperatively load genotype data into shared memory
-        // Each thread loads multiple elements
-        for (int m = threadIdx.x; m < chunk_size; m += blockDim.x) {
-            int global_m = m_start + m;
-
-            // Load scores (only need to do this once per chunk)
-            if (threadIdx.y == 0 && m < chunk_size) {
-                tile_scores[m] = scores[global_m];
+        // Load scores (first row of threads cooperate)
+        if (threadIdx.y == 0) {
+            for (int m = 0; m < chunk_size; m++) {
+                if (threadIdx.x == 0) {
+                    tile_scores[m] = scores[m_start + m];
+                }
             }
+        }
 
-            // Load genotypes for row indices
-            if (threadIdx.y < TILE_SIZE && row < N) {
-                tile_i[threadIdx.y][m] = genotypes[global_m * N + row];
+        // Load genotypes into shared memory
+        // Strategy: Each thread loads data for its own position
+        int global_row = blockIdx.y * blockDim.y + threadIdx.y;
+        int global_col = blockIdx.x * blockDim.x + threadIdx.x;
+
+        // Each thread loads its row's genotypes
+        if (global_row < N) {
+            for (int m = 0; m < chunk_size; m++) {
+                int global_m = m_start + m;
+                tile_i[threadIdx.y][m] = genotypes[global_m * N + global_row];
             }
+        }
 
-            // Load genotypes for column indices
-            if (threadIdx.y < TILE_SIZE && col < N) {
-                tile_j[threadIdx.y][m] = genotypes[global_m * N + col];
+        // Each thread loads its column's genotypes
+        if (global_col < N) {
+            for (int m = 0; m < chunk_size; m++) {
+                int global_m = m_start + m;
+                tile_j[threadIdx.x][m] = genotypes[global_m * N + global_col];
             }
         }
 
@@ -77,8 +86,8 @@ __global__ void compute_distance_kernel(
             // Skip unknown genotypes (9)
             if (geno_i == 9 || geno_j == 9) continue;
 
-            // Compute absolute difference
-            int diff = abs((int)geno_i - (int)geno_j);
+            // Compute absolute difference (explicit signed cast to avoid unsigned underflow)
+            int diff = abs((int)((signed char)geno_i) - (int)((signed char)geno_j));
 
             // Distance contribution: 0 for same, s^2 for het (diff=1), 4*s^2 for hom (diff=2)
             if (diff == 1) {
@@ -126,15 +135,17 @@ __global__ void compute_distance_kernel_diagonal(
         int m_end = min(m_start + GENOTYPE_CHUNK, M);
         int chunk_size = m_end - m_start;
 
-        // Cooperatively load (only need one tile since it's diagonal)
-        for (int m = threadIdx.x; m < chunk_size; m += blockDim.x) {
-            int global_m = m_start + m;
-
-            if (threadIdx.y == 0 && m < chunk_size) {
-                tile_scores[m] = scores[global_m];
+        // Load scores and genotypes
+        if (threadIdx.y == 0) {
+            for (int m = 0; m < chunk_size; m++) {
+                tile_scores[m] = scores[m_start + m];
             }
+        }
 
-            if (threadIdx.y < TILE_SIZE && row < N) {
+        // Each thread loads its row's genotypes
+        if (row < N) {
+            for (int m = 0; m < chunk_size; m++) {
+                int global_m = m_start + m;
                 tile_geno[threadIdx.y][m] = genotypes[global_m * N + row];
             }
         }
@@ -148,7 +159,7 @@ __global__ void compute_distance_kernel_diagonal(
 
             if (geno_i == 9 || geno_j == 9) continue;
 
-            int diff = abs((int)geno_i - (int)geno_j);
+            int diff = abs((int)((signed char)geno_i) - (int)((signed char)geno_j));
 
             if (diff == 1) {
                 float s = tile_scores[m];

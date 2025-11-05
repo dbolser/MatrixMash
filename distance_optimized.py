@@ -37,8 +37,8 @@ def compute_distance_numba_cpu(genotypes, scores, distances):
                 if geno_i == 9 or geno_j == 9:
                     continue
 
-                # Compute difference
-                diff = abs(int(geno_i) - int(geno_j))
+                # Compute difference (use np.int32 to avoid unsigned underflow)
+                diff = abs(np.int32(geno_i) - np.int32(geno_j))
 
                 # Add distance contribution
                 if diff == 1:

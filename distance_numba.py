@@ -31,8 +31,8 @@ def compute_distance_kernel(genotypes, scores, distances, M, N):
             if geno_i == 9 or geno_j == 9:
                 continue
 
-            # Compute difference
-            diff = abs(int(geno_i) - int(geno_j))
+            # Compute difference (use np.int32 to avoid unsigned underflow)
+            diff = abs(np.int32(geno_i) - np.int32(geno_j))
 
             # Distance contribution
             s = scores[m]
@@ -161,7 +161,7 @@ def compute_distance_numba_cuda_chunked(genotypes: np.ndarray, scores: np.ndarra
                             if geno_i == 9 or geno_j == 9:
                                 continue
 
-                            diff = abs(int(geno_i) - int(geno_j))
+                            diff = abs(np.int32(geno_i) - np.int32(geno_j))
                             s = scores[m]
                             if diff == 1:
                                 dist_sum += s * s
