@@ -105,6 +105,9 @@ cudaError_t compute_snp_contributions_cuda(
     float* d_contributions_out = nullptr;
     cudaError_t err = cudaSuccess;
 
+    const dim3 grid(k, (N + TILE_SIZE - 1) / TILE_SIZE, (N + TILE_SIZE - 1) / TILE_SIZE);
+    const dim3 block(1, TILE_SIZE, TILE_SIZE);
+
     const size_t genotypes_size = static_cast<size_t>(k) * N * sizeof(unsigned char);
     const size_t scores_size = static_cast<size_t>(k) * sizeof(float);
     const size_t contributions_size = static_cast<size_t>(k) * N * N * sizeof(float);
@@ -152,9 +155,6 @@ cudaError_t compute_snp_contributions_cuda(
                 cudaGetErrorString(err));
         goto cleanup;
     }
-
-    const dim3 grid(k, (N + TILE_SIZE - 1) / TILE_SIZE, (N + TILE_SIZE - 1) / TILE_SIZE);
-    const dim3 block(1, TILE_SIZE, TILE_SIZE);
 
 #ifdef DEBUG
     printf("Launching SNP contribution kernel: grid=(%d,%d,%d) block=(%d,%d,%d)\n",
