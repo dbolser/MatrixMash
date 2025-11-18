@@ -30,9 +30,14 @@ __global__ void compute_snp_contribution_kernel(
     const int row = blockIdx.y * blockDim.y + threadIdx.y;
     const int col = blockIdx.z * blockDim.z + threadIdx.z;
 
-    if (k_idx >= k || row >= N || col >= N || row > col) {
+    if (k_idx >= k) {
+        // All threads in this block map to the same SNP. It is safe for the
+        // entire block to exit early only when the whole block is out of range.
         return;
     }
+
+    const bool in_bounds = (row < N) && (col < N);
+    const bool compute_entry = in_bounds && (row <= col);
 
     // Shared memory for the TILE_SIZE entries along row/col for this SNP
     __shared__ unsigned char tile_rows[TILE_SIZE];
@@ -58,26 +63,28 @@ __global__ void compute_snp_contribution_kernel(
 
     __syncthreads();
 
-    const unsigned char geno_i = tile_rows[threadIdx.y];
-    const unsigned char geno_j = tile_cols[threadIdx.z];
+    if (compute_entry) {
+        const unsigned char geno_i = tile_rows[threadIdx.y];
+        const unsigned char geno_j = tile_cols[threadIdx.z];
 
-    float contribution = 0.0f;
-    if (geno_i != 9 && geno_j != 9) {
-        const int diff = abs((int)((signed char)geno_i) - (int)((signed char)geno_j));
-        if (diff == 1) {
-            contribution = score_sq;
-        } else if (diff == 2) {
-            contribution = 4.0f * score_sq;
+        float contribution = 0.0f;
+        if (geno_i != 9 && geno_j != 9) {
+            const int diff = abs((int)((signed char)geno_i) - (int)((signed char)geno_j));
+            if (diff == 1) {
+                contribution = score_sq;
+            } else if (diff == 2) {
+                contribution = 4.0f * score_sq;
+            }
         }
+
+        const size_t slice_size = static_cast<size_t>(N) * N;
+        const size_t base = static_cast<size_t>(k_idx) * slice_size;
+        const size_t out_idx_ij = base + static_cast<size_t>(row) * N + col;
+        const size_t out_idx_ji = base + static_cast<size_t>(col) * N + row;
+
+        contributions_out[out_idx_ij] = contribution;
+        contributions_out[out_idx_ji] = contribution;
     }
-
-    const size_t slice_size = static_cast<size_t>(N) * N;
-    const size_t base = static_cast<size_t>(k_idx) * slice_size;
-    const size_t out_idx_ij = base + static_cast<size_t>(row) * N + col;
-    const size_t out_idx_ji = base + static_cast<size_t>(col) * N + row;
-
-    contributions_out[out_idx_ij] = contribution;
-    contributions_out[out_idx_ji] = contribution;
 }
 
 #define CUDA_CHECK(call)                                                         \
