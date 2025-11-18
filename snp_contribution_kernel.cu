@@ -93,7 +93,7 @@ __global__ void compute_snp_contribution_kernel(
         if (err != cudaSuccess) {                                                \
             fprintf(stderr, "CUDA error in %s:%d: %s\n", __FILE__, __LINE__,     \
                     cudaGetErrorString(err));                                    \
-            exit(EXIT_FAILURE);                                                  \
+            return err;                                                          \
         }                                                                        \
     } while (0)
 
@@ -103,7 +103,7 @@ extern "C" {
  * Host entry-point: copies host batch to device, launches kernel, copies
  * contributions back. Assumes the caller sizes the batch to fit device memory.
  */
-void compute_snp_contributions_cuda(
+cudaError_t compute_snp_contributions_cuda(
     const unsigned char* h_genotypes_batch,  // (k, N)
     const float* h_scores_batch,             // (k)
     float* h_contributions_out,              // (k, N, N)
@@ -131,10 +131,12 @@ void compute_snp_contributions_cuda(
     const dim3 grid(k, (N + TILE_SIZE - 1) / TILE_SIZE, (N + TILE_SIZE - 1) / TILE_SIZE);
     const dim3 block(1, TILE_SIZE, TILE_SIZE);
 
+#ifdef DEBUG
     printf("Launching SNP contribution kernel: grid=(%d,%d,%d) block=(%d,%d,%d)\n",
            grid.x, grid.y, grid.z, block.x, block.y, block.z);
     printf("  Batch size k=%d, N=%d, output=%.2f MB\n", k, N,
            contributions_size / 1e6);
+#endif  // DEBUG
 
     compute_snp_contribution_kernel<<<grid, block>>>(
         d_genotypes_batch,
@@ -152,6 +154,7 @@ void compute_snp_contributions_cuda(
     CUDA_CHECK(cudaFree(d_genotypes_batch));
     CUDA_CHECK(cudaFree(d_scores_batch));
     CUDA_CHECK(cudaFree(d_contributions_out));
+    return cudaSuccess;
 }
 
 }  // extern "C"
