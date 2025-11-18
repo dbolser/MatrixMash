@@ -1,4 +1,16 @@
 cmake_minimum_required(VERSION 3.18)
+
+# Prevent in-source builds to protect the manual Makefile
+if("${CMAKE_SOURCE_DIR}" STREQUAL "${CMAKE_BINARY_DIR}")
+    message(FATAL_ERROR "
+    In-source builds are not allowed to protect the manual Makefile.
+    Please create a build directory and run cmake from there:
+        mkdir build
+        cd build
+        cmake ..
+    ")
+endif()
+
 project(MatrixMash CXX CUDA)
 
 set(CMAKE_CXX_STANDARD 17)
