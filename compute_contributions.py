@@ -15,6 +15,10 @@ import numpy as np
 
 LIB_NAME = "libsnp_contribution.so"
 
+# Module-level constants for dtype sizes (avoid repeated dtype instantiation)
+FLOAT32_SIZE = np.dtype(np.float32).itemsize
+UINT8_SIZE = np.dtype(np.uint8).itemsize
+
 ComputeFn = ctypes.CFUNCTYPE(
     ctypes.c_int,
     ctypes.POINTER(ctypes.c_ubyte),
@@ -72,9 +76,9 @@ def estimate_safe_batch_size(n: int, gpu_memory_gb: int) -> int:
 
     usable_bytes = gpu_memory_gb * (1024**3) * 0.80
     bytes_per_snp = (
-        (n * n * np.dtype(np.float32).itemsize)
-        + (n * np.dtype(np.uint8).itemsize)
-        + np.dtype(np.float32).itemsize
+        (n * n * FLOAT32_SIZE)
+        + (n * UINT8_SIZE)
+        + FLOAT32_SIZE
     )  # output + genotypes + score
     safe_k = int(usable_bytes // bytes_per_snp)
     safe_k = max(1, min(safe_k, 4096))
