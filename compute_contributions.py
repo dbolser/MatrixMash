@@ -15,6 +15,19 @@ import numpy as np
 
 LIB_NAME = "libsnp_contribution.so"
 
+# Module-level constants for dtype sizes (avoid repeated dtype instantiation)
+FLOAT32_SIZE = np.dtype(np.float32).itemsize
+UINT8_SIZE = np.dtype(np.uint8).itemsize
+
+ComputeFn = ctypes.CFUNCTYPE(
+    ctypes.c_int,
+    ctypes.POINTER(ctypes.c_ubyte),
+    ctypes.POINTER(ctypes.c_float),
+    ctypes.POINTER(ctypes.c_float),
+    ctypes.c_int,
+    ctypes.c_int,
+)
+
 
 def _load_cuda_lib() -> ctypes.CDLL:
     lib_path = os.path.join(os.path.dirname(__file__), LIB_NAME)
@@ -27,17 +40,8 @@ def _load_cuda_lib() -> ctypes.CDLL:
         ) from exc
 
 
-def _bind_cuda(lib: ctypes.CDLL) -> ctypes.CFUNCTYPE:
-    fn = lib.compute_snp_contributions_cuda
-    fn.argtypes = [
-        ctypes.POINTER(ctypes.c_ubyte),
-        ctypes.POINTER(ctypes.c_float),
-        ctypes.POINTER(ctypes.c_float),
-        ctypes.c_int,
-        ctypes.c_int,
-    ]
-    fn.restype = None
-    return fn
+def _bind_cuda(lib: ctypes.CDLL) -> ComputeFn:
+    return ComputeFn(("compute_snp_contributions_cuda", lib))
 
 
 @dataclass
@@ -71,7 +75,11 @@ def estimate_safe_batch_size(n: int, gpu_memory_gb: int) -> int:
     """Estimate a safe SNP batch size that fits in GPU memory."""
 
     usable_bytes = gpu_memory_gb * (1024**3) * 0.80
-    bytes_per_snp = (n * n * 4) + (n * 1) + 4  # output + genotypes + score
+    bytes_per_snp = (
+        (n * n * FLOAT32_SIZE)
+        + (n * UINT8_SIZE)
+        + FLOAT32_SIZE
+    )  # output + genotypes + score
     safe_k = int(usable_bytes // bytes_per_snp)
     safe_k = max(1, min(safe_k, 4096))
 
@@ -87,7 +95,7 @@ def batch_iterator(dataset: Dataset, batch_size: int):
         yield start, end, dataset.genotypes[start:end], dataset.scores[start:end]
 
 
-def run_phase1(dataset: Dataset, batch_size: int, compute_fn) -> None:
+def run_phase1(dataset: Dataset, batch_size: int, compute_fn: ComputeFn) -> None:
     for start, end, geno_batch, score_batch in batch_iterator(dataset, batch_size):
         k_current = end - start
 
@@ -98,25 +106,25 @@ def run_phase1(dataset: Dataset, batch_size: int, compute_fn) -> None:
         contributions = np.zeros((k_current, dataset.n_individuals, dataset.n_individuals), dtype=np.float32)
 
         start_time = time.time()
-        compute_fn(
+        err_code = compute_fn(
             geno_batch.ctypes.data_as(ctypes.POINTER(ctypes.c_ubyte)),
             score_batch.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
             contributions.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
             ctypes.c_int(k_current),
             ctypes.c_int(dataset.n_individuals),
         )
+        if err_code != 0:
+            raise RuntimeError(
+                f"compute_snp_contributions_cuda failed with CUDA error code {err_code}"
+            )
         elapsed = time.time() - start_time
 
         print(f"Phase 1 kernel finished in {elapsed:.3f}s")
         contrib_min = float(contributions.min()) if contributions.size else 0.0
         contrib_max = float(contributions.max()) if contributions.size else 0.0
         print(
-            "  Output tensor: shape={} size={:.2f} MB min={:.3f} max={:.3f}".format(
-                contributions.shape,
-                contributions.nbytes / 1e6,
-                contrib_min,
-                contrib_max,
-            )
+            f"  Output tensor: shape={contributions.shape} size={contributions.nbytes / 1e6:.2f} MB "
+            f"min={contrib_min:.3f} max={contrib_max:.3f}"
         )
 
         # Placeholder for Phase 2 hook

@@ -87,23 +87,13 @@ __global__ void compute_snp_contribution_kernel(
     }
 }
 
-#define CUDA_CHECK(call)                                                         \
-    do {                                                                         \
-        cudaError_t err = call;                                                  \
-        if (err != cudaSuccess) {                                                \
-            fprintf(stderr, "CUDA error in %s:%d: %s\n", __FILE__, __LINE__,     \
-                    cudaGetErrorString(err));                                    \
-            exit(EXIT_FAILURE);                                                  \
-        }                                                                        \
-    } while (0)
-
 extern "C" {
 
 /*
  * Host entry-point: copies host batch to device, launches kernel, copies
  * contributions back. Assumes the caller sizes the batch to fit device memory.
  */
-void compute_snp_contributions_cuda(
+cudaError_t compute_snp_contributions_cuda(
     const unsigned char* h_genotypes_batch,  // (k, N)
     const float* h_scores_batch,             // (k)
     float* h_contributions_out,              // (k, N, N)
@@ -113,28 +103,65 @@ void compute_snp_contributions_cuda(
     unsigned char* d_genotypes_batch = nullptr;
     float* d_scores_batch = nullptr;
     float* d_contributions_out = nullptr;
+    cudaError_t err = cudaSuccess;
 
     const size_t genotypes_size = static_cast<size_t>(k) * N * sizeof(unsigned char);
     const size_t scores_size = static_cast<size_t>(k) * sizeof(float);
     const size_t contributions_size = static_cast<size_t>(k) * N * N * sizeof(float);
 
-    CUDA_CHECK(cudaMalloc(&d_genotypes_batch, genotypes_size));
-    CUDA_CHECK(cudaMalloc(&d_scores_batch, scores_size));
-    CUDA_CHECK(cudaMalloc(&d_contributions_out, contributions_size));
+    err = cudaMalloc(&d_genotypes_batch, genotypes_size);
+    if (err != cudaSuccess) {
+        fprintf(stderr, "CUDA error in %s:%d: %s\n", __FILE__, __LINE__,
+                cudaGetErrorString(err));
+        goto cleanup;
+    }
 
-    CUDA_CHECK(cudaMemcpy(d_genotypes_batch, h_genotypes_batch, genotypes_size,
-                          cudaMemcpyHostToDevice));
-    CUDA_CHECK(cudaMemcpy(d_scores_batch, h_scores_batch, scores_size,
-                          cudaMemcpyHostToDevice));
-    CUDA_CHECK(cudaMemset(d_contributions_out, 0, contributions_size));
+    err = cudaMalloc(&d_scores_batch, scores_size);
+    if (err != cudaSuccess) {
+        fprintf(stderr, "CUDA error in %s:%d: %s\n", __FILE__, __LINE__,
+                cudaGetErrorString(err));
+        goto cleanup;
+    }
+
+    err = cudaMalloc(&d_contributions_out, contributions_size);
+    if (err != cudaSuccess) {
+        fprintf(stderr, "CUDA error in %s:%d: %s\n", __FILE__, __LINE__,
+                cudaGetErrorString(err));
+        goto cleanup;
+    }
+
+    err = cudaMemcpy(d_genotypes_batch, h_genotypes_batch, genotypes_size,
+                     cudaMemcpyHostToDevice);
+    if (err != cudaSuccess) {
+        fprintf(stderr, "CUDA error in %s:%d: %s\n", __FILE__, __LINE__,
+                cudaGetErrorString(err));
+        goto cleanup;
+    }
+
+    err = cudaMemcpy(d_scores_batch, h_scores_batch, scores_size,
+                     cudaMemcpyHostToDevice);
+    if (err != cudaSuccess) {
+        fprintf(stderr, "CUDA error in %s:%d: %s\n", __FILE__, __LINE__,
+                cudaGetErrorString(err));
+        goto cleanup;
+    }
+
+    err = cudaMemset(d_contributions_out, 0, contributions_size);
+    if (err != cudaSuccess) {
+        fprintf(stderr, "CUDA error in %s:%d: %s\n", __FILE__, __LINE__,
+                cudaGetErrorString(err));
+        goto cleanup;
+    }
 
     const dim3 grid(k, (N + TILE_SIZE - 1) / TILE_SIZE, (N + TILE_SIZE - 1) / TILE_SIZE);
     const dim3 block(1, TILE_SIZE, TILE_SIZE);
 
+#ifdef DEBUG
     printf("Launching SNP contribution kernel: grid=(%d,%d,%d) block=(%d,%d,%d)\n",
            grid.x, grid.y, grid.z, block.x, block.y, block.z);
     printf("  Batch size k=%d, N=%d, output=%.2f MB\n", k, N,
            contributions_size / 1e6);
+#endif  // DEBUG
 
     compute_snp_contribution_kernel<<<grid, block>>>(
         d_genotypes_batch,
@@ -143,15 +170,33 @@ void compute_snp_contributions_cuda(
         k,
         N);
 
-    CUDA_CHECK(cudaGetLastError());
-    CUDA_CHECK(cudaDeviceSynchronize());
+    err = cudaGetLastError();
+    if (err != cudaSuccess) {
+        fprintf(stderr, "CUDA error in %s:%d: %s\n", __FILE__, __LINE__,
+                cudaGetErrorString(err));
+        goto cleanup;
+    }
 
-    CUDA_CHECK(cudaMemcpy(h_contributions_out, d_contributions_out, contributions_size,
-                          cudaMemcpyDeviceToHost));
+    err = cudaDeviceSynchronize();
+    if (err != cudaSuccess) {
+        fprintf(stderr, "CUDA error in %s:%d: %s\n", __FILE__, __LINE__,
+                cudaGetErrorString(err));
+        goto cleanup;
+    }
 
-    CUDA_CHECK(cudaFree(d_genotypes_batch));
-    CUDA_CHECK(cudaFree(d_scores_batch));
-    CUDA_CHECK(cudaFree(d_contributions_out));
+    err = cudaMemcpy(h_contributions_out, d_contributions_out, contributions_size,
+                     cudaMemcpyDeviceToHost);
+    if (err != cudaSuccess) {
+        fprintf(stderr, "CUDA error in %s:%d: %s\n", __FILE__, __LINE__,
+                cudaGetErrorString(err));
+        goto cleanup;
+    }
+
+cleanup:
+    if (d_genotypes_batch) cudaFree(d_genotypes_batch);
+    if (d_scores_batch) cudaFree(d_scores_batch);
+    if (d_contributions_out) cudaFree(d_contributions_out);
+    return err;
 }
 
 }  // extern "C"
