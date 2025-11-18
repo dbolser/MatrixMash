@@ -20,8 +20,10 @@ if(NOT DEFINED CUDA_ARCH)
 endif()
 
 # Compiler flags
-set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -O3 -Xcompiler -fPIC")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -fPIC")
+set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -Xcompiler -fPIC")
+set(CMAKE_CUDA_FLAGS_RELEASE "${CMAKE_CUDA_FLAGS_RELEASE} -O3")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC")
+set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3")
 
 # Source files
 set(CUDA_SOURCES distance_cuda.cu)
@@ -63,6 +65,7 @@ target_link_libraries(distance_cuda_benchmark
     distance_cuda_static
     benchmark::benchmark
     benchmark::benchmark_main
+    CUDA::cudart
 )
 
 # Install rules (optional)

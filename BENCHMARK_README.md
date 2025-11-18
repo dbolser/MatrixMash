@@ -172,7 +172,7 @@ BM_Complexity_ScalingN_BigO       0.000 N^2       0.000 N^2
 ```
 
 This shows:
-- **Scaling with M**: Linear O(N) - doubling M doubles time
+- **Scaling with M**: Linear O(M) - doubling M doubles time
 - **Scaling with N**: Quadratic O(N²) - doubling N quadruples time
 - **Overall**: Confirms theoretical O(M × N²) complexity
 
@@ -221,6 +221,6 @@ make benchmark CUDA_ARCH=-arch=sm_89
 
 ## References
 
-- [Google Benchmark Documentation](https://github.com/google/benchmark)
+- [Google Benchmark Documentation](https://github.com/google/benchmark/blob/main/docs/user_guide.md)
 - [CUDA Programming Guide](https://docs.nvidia.com/cuda/cuda-c-programming-guide/)
 
