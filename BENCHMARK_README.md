@@ -11,27 +11,44 @@ This project uses [Google Benchmark](https://github.com/google/benchmark) for C+
 
 ## Building Benchmarks
 
-### Using CMake directly:
+### Using CMake directly (recommended):
 
 ```bash
-mkdir -p build
-cd build
-cmake -DCMAKE_BUILD_TYPE=Release -DCUDA_ARCH=86 ..
-cmake --build . --target distance_cuda_benchmark
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCUDA_ARCH=86
+cmake --build build --target distance_cuda_benchmark
 ```
 
-**Note:** Use `-DCUDA_ARCH=86` (just the number), not `-DCUDA_ARCH=sm_86`
+**Notes**
+
+- Always configure out of source (`build/`) to keep the repo clean.
+- Pass the numeric compute capability (`86`, `75`, `89`, …) to `CUDA_ARCH`.
 
 ### Using Makefile:
 
 ```bash
-make benchmark
+make benchmark              # uses CUDA_ARCH=-arch=sm_86 by default
 ```
 
 This will:
 1. Configure CMake (automatically downloads Google Benchmark)
 2. Build the benchmark executable
 3. Run the benchmarks
+
+## Building the CUDA Library
+
+Use the Makefile for the shared library that the Python wrapper consumes:
+
+```bash
+make                              # builds libdistance_cuda.so with sm_86
+make libdistance_cuda_auto.so     # lets NVCC auto-detect the architecture
+```
+
+The same target can be produced via CMake:
+
+```bash
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCUDA_ARCH=86
+cmake --build build --target distance_cuda_shared
+```
 
 ## Running Benchmarks
 
@@ -176,15 +193,15 @@ cmake --build . --target distance_cuda_benchmark
 Set the CUDA architecture when configuring CMake:
 
 ```bash
-cmake -DCUDA_ARCH=sm_86 ..  # For RTX 4060
-cmake -DCUDA_ARCH=sm_75 ..  # For RTX 2000 series
-cmake -DCUDA_ARCH=sm_89 ..  # For RTX 5000 series
+cmake -S . -B build -DCUDA_ARCH=86   # For RTX 4060 (sm_86)
+cmake -S . -B build -DCUDA_ARCH=75   # For RTX 2000 series (sm_75)
+cmake -S . -B build -DCUDA_ARCH=89   # For RTX 5000 series (sm_89)
 ```
 
 Or use the Makefile:
 
 ```bash
-make benchmark CUDA_ARCH=sm_89
+make benchmark CUDA_ARCH=-arch=sm_89
 ```
 
 ## Troubleshooting

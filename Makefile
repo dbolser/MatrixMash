@@ -34,8 +34,8 @@ snp_contribution_benchmark: snp_contribution_benchmark.cpp libsnp_contribution.s
 # Alternative: auto-detect architecture (requires compute capability)
 libdistance_cuda_auto.so: distance_cuda.cu
 	@echo "Compiling with auto-detected architecture..."
-	$(NVCC) $(CUDA_FLAGS) -arch=native -shared -o libdistance_cuda.so $<
-	@echo "✓ Built libdistance_cuda.so"
+	$(NVCC) $(CUDA_FLAGS) -arch=native -shared -o $@ $<
+	@echo "✓ Built $@"
 
 # Test build
 test: libdistance_cuda.so
@@ -50,7 +50,7 @@ benchmark: $(BUILD_DIR)/distance_cuda_benchmark
 $(BUILD_DIR)/distance_cuda_benchmark: CMakeLists.txt distance_cuda.cu distance_cuda_benchmark.cpp
 	@echo "Configuring CMake build..."
 	@mkdir -p $(BUILD_DIR)
-	@cd $(BUILD_DIR) && cmake -DCMAKE_BUILD_TYPE=$(CMAKE_BUILD_TYPE) -DCUDA_ARCH=$(shell echo $(CUDA_ARCH) | sed 's/-arch=//') ..
+	@cd $(BUILD_DIR) && cmake -DCMAKE_BUILD_TYPE=$(CMAKE_BUILD_TYPE) -DCUDA_ARCH=$(shell echo $(CUDA_ARCH) | sed 's/-arch=sm_//') ..
 	@echo "Building benchmarks..."
 	@cd $(BUILD_DIR) && cmake --build . --target distance_cuda_benchmark
 	@echo "✓ Built benchmark executable"

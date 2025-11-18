@@ -35,6 +35,7 @@ set_target_properties(distance_cuda_shared PROPERTIES
     CUDA_SEPARABLE_COMPILATION ON
     CUDA_ARCHITECTURES ${CUDA_ARCH}
 )
+target_link_libraries(distance_cuda_shared PRIVATE CUDA::cudart)
 
 # Build static library (for benchmarks)
 add_library(distance_cuda_static STATIC ${CUDA_SOURCES})
