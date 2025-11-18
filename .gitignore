@@ -2,3 +2,19 @@
 .venv
 __pycache__
 *.so
+*.a
+
+# CMake build artifacts
+build/
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+_deps/
+
+# CMake-generated files (repo-owned modules live under cmake/)
+*.cmake
+!CMakeLists.txt
+!cmake/*.cmake
+
+# Build executables
+distance_cuda_benchmark

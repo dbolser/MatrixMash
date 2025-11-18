@@ -4,6 +4,7 @@
 NVCC = nvcc
 CUDA_ARCH = -arch=sm_86  # RTX 4060 Laptop (use sm_86, closest to 8.9 for CUDA 11.5)
 CUDA_FLAGS = -O3 -Xcompiler -fPIC --compiler-options '-fPIC'
+CXX_STD = -std=c++17
 
 # Detect actual GPU architecture
 detect_arch:
@@ -21,6 +22,11 @@ libsnp_contribution.so: snp_contribution_kernel.cu
 	$(NVCC) $(CUDA_FLAGS) $(CUDA_ARCH) -shared -o $@ $<
 	@echo "✓ Built $@"
 
+snp_contribution_benchmark: snp_contribution_benchmark.cpp libsnp_contribution.so
+	@echo "Building SNP contribution benchmark..."
+	$(NVCC) $(CUDA_FLAGS) $(CUDA_ARCH) $(CXX_STD) -o $@ $< -L. -lsnp_contribution -Xlinker -rpath -Xlinker '$$ORIGIN'
+	@echo "✓ Built $@"
+
 # Alternative: auto-detect architecture (requires compute capability)
 libdistance_cuda_auto.so: distance_cuda.cu
 	@echo "Compiling with auto-detected architecture..."
@@ -34,7 +40,7 @@ test: libdistance_cuda.so
 
 # Clean
 clean:
-	rm -f libdistance_cuda.so libsnp_contribution.so *.o
+	rm -f libdistance_cuda.so libsnp_contribution.so snp_contribution_benchmark *.o
 
 # Help
 help:
@@ -44,6 +50,7 @@ help:
 	@echo "  make                  - Build libdistance_cuda.so (default sm_86 for RTX 4060)"
 	@echo "  make libdistance_cuda_auto.so - Auto-detect GPU architecture"
 	@echo "  make libsnp_contribution.so  - Build Phase 1 SNP contribution kernel"
+	@echo "  make snp_contribution_benchmark - Build native benchmark harness"
 	@echo "  make test            - Build and run test"
 	@echo "  make detect_arch     - Show GPU compute capability"
 	@echo "  make clean           - Remove build artifacts"
