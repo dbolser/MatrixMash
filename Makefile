@@ -12,14 +12,14 @@ detect_arch:
 
 # Build shared library
 libdistance_cuda.so: distance_cuda.cu
-        @echo "Compiling CUDA kernel..."
-        $(NVCC) $(CUDA_FLAGS) $(CUDA_ARCH) -shared -o $@ $<
-        @echo "✓ Built $@"
+	@echo "Compiling CUDA kernel..."
+	$(NVCC) $(CUDA_FLAGS) $(CUDA_ARCH) -shared -o $@ $<
+	@echo "✓ Built $@"
 
 libsnp_contribution.so: snp_contribution_kernel.cu
-        @echo "Compiling SNP contribution kernel..."
-        $(NVCC) $(CUDA_FLAGS) $(CUDA_ARCH) -shared -o $@ $<
-        @echo "✓ Built $@"
+	@echo "Compiling SNP contribution kernel..."
+	$(NVCC) $(CUDA_FLAGS) $(CUDA_ARCH) -shared -o $@ $<
+	@echo "✓ Built $@"
 
 # Alternative: auto-detect architecture (requires compute capability)
 libdistance_cuda_auto.so: distance_cuda.cu
@@ -34,17 +34,17 @@ test: libdistance_cuda.so
 
 # Clean
 clean:
-        rm -f libdistance_cuda.so libsnp_contribution.so *.o
+	rm -f libdistance_cuda.so libsnp_contribution.so *.o
 
 # Help
 help:
 	@echo "CUDA Distance Matrix Makefile"
 	@echo ""
 	@echo "Targets:"
-        @echo "  make                  - Build libdistance_cuda.so (default sm_86 for RTX 4060)"
-        @echo "  make libdistance_cuda_auto.so - Auto-detect GPU architecture"
-        @echo "  make libsnp_contribution.so  - Build Phase 1 SNP contribution kernel"
-        @echo "  make test            - Build and run test"
+	@echo "  make                  - Build libdistance_cuda.so (default sm_86 for RTX 4060)"
+	@echo "  make libdistance_cuda_auto.so - Auto-detect GPU architecture"
+	@echo "  make libsnp_contribution.so  - Build Phase 1 SNP contribution kernel"
+	@echo "  make test            - Build and run test"
 	@echo "  make detect_arch     - Show GPU compute capability"
 	@echo "  make clean           - Remove build artifacts"
 	@echo ""
