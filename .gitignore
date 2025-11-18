@@ -18,3 +18,4 @@ _deps/
 
 # Build executables
 distance_cuda_benchmark
+snp_contribution_benchmark
